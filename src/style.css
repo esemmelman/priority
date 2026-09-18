@@ -3,3 +3,4 @@
 .content{margin:32px auto 64px}@media(max-width:600px){.content{margin:18px auto 48px}}
 .item{cursor:grab;touch-action:none}.item.dragging{cursor:grabbing}.item-title,.delete,.edit-input{cursor:initial}.item-title{touch-action:none}
 .item{min-height:52px}.item-title,.edit-input{padding-top:6px;padding-bottom:6px}
+.item{min-height:42px}.item-title{font-weight:700;padding-top:3px;padding-bottom:3px}.edit-input{padding-top:3px;padding-bottom:3px}
