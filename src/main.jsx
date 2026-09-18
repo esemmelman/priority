@@ -6,7 +6,7 @@ import { DndContext, KeyboardSensor, MouseSensor, TouchSensor, closestCenter, us
 import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Keyboard, Mic, Plus, Trash2, X } from 'lucide-react';
-import { mergeTranscript } from './transcript.js';
+import { capitalizeFirstLetter, mergeTranscript } from './transcript.js';
 import './style.css';
 
 const url = import.meta.env.VITE_SUPABASE_URL;
@@ -40,6 +40,7 @@ function App() {
   const [typingMode, setTypingMode] = useState(false);
   const inputRef = useRef(null);
   const voiceTappedRef = useRef(false);
+  const voiceStartTimerRef = useRef(null);
   const speechRef = useRef(null);
   const itemsRef = useRef(items);
   const savingRef = useRef(false);
@@ -71,6 +72,8 @@ function App() {
     finally { savingRef.current = false; setSaving(false); }
   };
   const stopVoice = () => {
+    clearTimeout(voiceStartTimerRef.current);
+    voiceStartTimerRef.current = null;
     const session = speechRef.current;
     if (!session) return;
     session.active = false;
@@ -104,7 +107,7 @@ function App() {
     const autoAddVoice = () => {
       if (!session.active) return;
       const dictated = mergeTranscript(session.committed, session.segmentText || '');
-      const title = [session.base, dictated].filter(Boolean).join(' ').trim();
+      const title = capitalizeFirstLetter([session.base, dictated].filter(Boolean).join(' ').trim());
       stopVoice();
       if (dictated) void saveItem(title);
     };
@@ -124,7 +127,7 @@ function App() {
       }
       session.segmentText = segment;
       const dictated = mergeTranscript(session.committed, segment);
-      setInput([session.base, dictated].filter(Boolean).join(' '));
+      setInput(capitalizeFirstLetter([session.base, dictated].filter(Boolean).join(' ')));
       armSilenceTimer();
     };
     recognition.onerror = event => {
@@ -143,7 +146,7 @@ function App() {
     };
     try { recognition.start(); } catch { speechRef.current = null; setError('Could not start voice input. You can still type an item.'); }
   };
-  useEffect(() => () => { if (speechRef.current) { clearTimeout(speechRef.current.timer); clearTimeout(speechRef.current.restartTimer); speechRef.current.recognition.abort(); } }, []);
+  useEffect(() => () => { clearTimeout(voiceStartTimerRef.current); if (speechRef.current) { clearTimeout(speechRef.current.timer); clearTimeout(speechRef.current.restartTimer); speechRef.current.recognition.abort(); } }, []);
   const refresh = async () => {
     if (!db) { setError('Supabase is not configured. Add VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY.'); setLoading(false); return; }
     const { data, error } = await db.from('priority_items_v1').select('id,title,position').order('position', { ascending: true }).order('created_at', { ascending: true });
@@ -181,7 +184,7 @@ function App() {
       <section className="list-panel">
         {error && <div className="error" role="alert">{error}<button onClick={() => setError('')} aria-label="Dismiss error"><X size={15}/></button></div>}
         {loading ? <div className="empty">Loading your list…</div> : items.length === 0 ? <div className="empty"><div className="empty-icon">✳</div><strong>A fresh start.</strong><span>Add your first item below.</span></div> : <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={dragEnd}><SortableContext items={items.map(x => x.id)} strategy={verticalListSortingStrategy}><div className="items">{items.map((item, i) => <SortableItem key={item.id} item={item} index={i} onDelete={remove} onEdit={edit}/>)}</div></SortableContext></DndContext>}
-        <form className={`add-form ${listening ? 'listening' : ''}`} onSubmit={add}><button className="add-trigger" type="submit" disabled={!input.trim() || saving} aria-label="Add item" title="Add item"><Plus size={22}/></button><EntryField ref={inputRef} rows={isAndroid ? 1 : undefined} value={input} readOnly={androidVoiceAvailable && !typingMode} inputMode={androidVoiceAvailable && !typingMode ? 'none' : 'text'} onPointerDown={e => { if (androidVoiceAvailable && !typingMode) { e.preventDefault(); if (voiceTappedRef.current) switchToTyping(); else { voiceTappedRef.current = true; startVoice(); } } }} onChange={e => { if (listening) stopVoice(); setInput(e.target.value); }} placeholder={listening ? 'Listening…' : 'Add something to your list…'} aria-label="New list item" maxLength={200}/>{androidVoiceAvailable && <button className="entry-mode" type="button" onClick={typingMode ? switchToVoice : switchToTyping} aria-label={typingMode ? 'Switch to voice input' : 'Switch to typing'} title={typingMode ? 'Switch to voice input' : 'Switch to typing'}>{typingMode ? <Mic size={18}/> : <Keyboard size={18}/>}</button>}</form>
+        <form className={`add-form ${listening ? 'listening' : ''}`} onSubmit={add}><button className="add-trigger" type="submit" disabled={!input.trim() || saving} aria-label="Add item" title="Add item"><Plus size={22}/></button><EntryField ref={inputRef} rows={isAndroid ? 1 : undefined} value={input} readOnly={androidVoiceAvailable && !typingMode} inputMode={androidVoiceAvailable && !typingMode ? 'none' : 'text'} onPointerDown={e => { if (androidVoiceAvailable && !typingMode) { e.preventDefault(); if (voiceTappedRef.current) switchToTyping(); else { voiceTappedRef.current = true; voiceStartTimerRef.current = setTimeout(() => { voiceStartTimerRef.current = null; startVoice(); }, 350); } } }} onChange={e => { if (listening) stopVoice(); setInput(e.target.value); }} placeholder={listening ? 'Listening…' : 'Add something to your list…'} aria-label="New list item" maxLength={200}/>{androidVoiceAvailable && <button className="entry-mode" type="button" onClick={typingMode ? switchToVoice : switchToTyping} aria-label={typingMode ? 'Switch to voice input' : 'Switch to typing'} title={typingMode ? 'Switch to voice input' : 'Switch to typing'}>{typingMode ? <Mic size={18}/> : <Keyboard size={18}/>}</button>}</form>
       </section></main>
   </div>;
 }

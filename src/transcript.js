@@ -16,3 +16,7 @@ export function mergeTranscript(previous, next) {
   }
   return [...oldWords, ...newWords.slice(overlap)].join(' ');
 }
+
+export function capitalizeFirstLetter(text) {
+  return text.replace(/\p{L}/u, letter => letter.toLocaleUpperCase());
+}
