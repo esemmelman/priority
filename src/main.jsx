@@ -4,7 +4,7 @@ import { createClient } from '@supabase/supabase-js';
 import { DndContext, KeyboardSensor, PointerSensor, closestCenter, useSensor, useSensors } from '@dnd-kit/core';
 import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { ArrowUpRight, Check, GripVertical, Plus, Trash2, X } from 'lucide-react';
+import { ArrowUpRight, GripVertical, Plus, Trash2, X } from 'lucide-react';
 import './style.css';
 
 const url = import.meta.env.VITE_SUPABASE_URL;
@@ -71,14 +71,12 @@ function App() {
     if (error) { setItems(items); setError(error.message); }
   };
   return <div className="shell">
-    <header className="topbar"><div className="brand"><span className="brand-icon"><Check size={16} strokeWidth={3}/></span><span>priority<span className="brand-dot">.</span></span></div><span className="top-caption">A little clarity, every day</span></header>
-    <main className="content"><div className="eyebrow"><span className="eyebrow-line"/>YOUR SPACE <span className="eyebrow-line"/></div><h1>Put first things <em>first.</em></h1><p className="intro">A simple place for what matters. Add your thoughts, then drag them into the order that feels right.</p>
-      <section className="list-panel"><div className="section-head"><div><span className="section-kicker">THE LIST</span><h2>In your order <span className="count">{items.length}</span></h2></div><span className="drag-hint"><GripVertical size={14}/> Drag to reorder</span></div>
+    <main className="content">
+      <section className="list-panel">
         {error && <div className="error" role="alert">{error}<button onClick={() => setError('')} aria-label="Dismiss error"><X size={15}/></button></div>}
         {loading ? <div className="empty">Loading your list…</div> : items.length === 0 ? <div className="empty"><div className="empty-icon">✳</div><strong>A fresh start.</strong><span>Add your first item below.</span></div> : <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={dragEnd}><SortableContext items={items.map(x => x.id)} strategy={verticalListSortingStrategy}><div className="items">{items.map((item, i) => <SortableItem key={item.id} item={item} index={i} onDelete={remove} onEdit={edit}/>)}</div></SortableContext></DndContext>}
         <form className="add-form" onSubmit={add}><Plus size={20}/><input value={input} onChange={e => setInput(e.target.value)} placeholder="Add something to your list…" aria-label="New list item" maxLength={200}/><button type="submit" disabled={!input.trim() || saving}>Add item <ArrowUpRight size={16}/></button></form>
-      </section><p className="footnote">Everything in its place. You can always change your mind.</p></main>
-    <footer><span>PRIORITY © {new Date().getFullYear()}</span><span>Made for the things that matter.</span></footer>
+      </section></main>
   </div>;
 }
 
