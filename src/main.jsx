@@ -4,12 +4,13 @@ import { createClient } from '@supabase/supabase-js';
 import { DndContext, KeyboardSensor, MouseSensor, TouchSensor, closestCenter, useSensor, useSensors } from '@dnd-kit/core';
 import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Plus, Trash2, X } from 'lucide-react';
+import { Keyboard, Mic, Plus, Trash2, X } from 'lucide-react';
 import './style.css';
 
 const url = import.meta.env.VITE_SUPABASE_URL;
 const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 const db = url && key ? createClient(url, key) : null;
+const androidVoiceAvailable = /Android/i.test(navigator.userAgent) && !!(window.SpeechRecognition || window.webkitSpeechRecognition);
 
 function SortableItem({ item, index, onDelete, onEdit }) {
   const [editing, setEditing] = useState(false);
@@ -33,6 +34,8 @@ function App() {
   const [items, setItems] = useState([]);
   const [input, setInput] = useState('');
   const [listening, setListening] = useState(false);
+  const [typingMode, setTypingMode] = useState(false);
+  const inputRef = useRef(null);
   const speechRef = useRef(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -54,6 +57,7 @@ function App() {
   };
   const startVoice = () => {
     if (!/Android/i.test(navigator.userAgent) || speechRef.current) return;
+    inputRef.current?.blur();
     const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!Recognition) { setError('Voice input is not supported by this browser. You can still type an item.'); return; }
     const recognition = new Recognition();
@@ -110,7 +114,7 @@ function App() {
     stopVoice();
     setSaving(true); setError('');
     const { data, error } = await db.from('priority_items_v1').insert({ title, position: items.length ? Math.max(...items.map(x => x.position)) + 1 : 0 }).select('id,title,position').single();
-    if (error) setError(error.message); else { setItems(prev => [...prev, data]); setInput(''); }
+    if (error) setError(error.message); else { setItems(prev => [...prev, data]); setInput(''); setTypingMode(false); }
     setSaving(false);
   };
   const edit = async (id, title) => {
@@ -137,7 +141,7 @@ function App() {
       <section className="list-panel">
         {error && <div className="error" role="alert">{error}<button onClick={() => setError('')} aria-label="Dismiss error"><X size={15}/></button></div>}
         {loading ? <div className="empty">Loading your list…</div> : items.length === 0 ? <div className="empty"><div className="empty-icon">✳</div><strong>A fresh start.</strong><span>Add your first item below.</span></div> : <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={dragEnd}><SortableContext items={items.map(x => x.id)} strategy={verticalListSortingStrategy}><div className="items">{items.map((item, i) => <SortableItem key={item.id} item={item} index={i} onDelete={remove} onEdit={edit}/>)}</div></SortableContext></DndContext>}
-        <form className={`add-form ${listening ? 'listening' : ''}`} onSubmit={add}><button className="add-trigger" type="submit" disabled={!input.trim() || saving} aria-label="Add item" title="Add item"><Plus size={22}/></button><input value={input} onClick={startVoice} onChange={e => { if (listening) stopVoice(); setInput(e.target.value); }} placeholder={listening ? 'Listening…' : 'Add something to your list…'} aria-label="New list item" maxLength={200}/></form>
+        <form className={`add-form ${listening ? 'listening' : ''}`} onSubmit={add}><button className="add-trigger" type="submit" disabled={!input.trim() || saving} aria-label="Add item" title="Add item"><Plus size={22}/></button><input ref={inputRef} value={input} readOnly={androidVoiceAvailable && !typingMode} inputMode={androidVoiceAvailable && !typingMode ? 'none' : 'text'} onPointerDown={e => { if (androidVoiceAvailable && !typingMode) { e.preventDefault(); startVoice(); } }} onChange={e => { if (listening) stopVoice(); setInput(e.target.value); }} placeholder={listening ? 'Listening…' : 'Add something to your list…'} aria-label="New list item" maxLength={200}/>{androidVoiceAvailable && <button className="entry-mode" type="button" onClick={() => { stopVoice(); setTypingMode(value => { if (value) inputRef.current?.blur(); else setTimeout(() => inputRef.current?.focus(), 0); return !value; }); }} aria-label={typingMode ? 'Switch to voice input' : 'Switch to typing'} title={typingMode ? 'Switch to voice input' : 'Switch to typing'}>{typingMode ? <Mic size={18}/> : <Keyboard size={18}/>}</button>}</form>
       </section></main>
   </div>;
 }
