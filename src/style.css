@@ -7,3 +7,4 @@
 .item,.item-title{touch-action:manipulation}
 .add-form .add-trigger{display:grid;place-items:center;flex:0 0 36px;width:36px;height:36px;padding:0;border:0;border-radius:6px;background:transparent;color:#587759}.add-form .add-trigger:hover{background:#e9f0e7;color:#405e47}.add-form .add-trigger:disabled{background:transparent;color:#9eb19b;opacity:.7}
 .item-title,.edit-input{font-size:15px}
+.add-form.listening{border-color:#86a980;box-shadow:0 0 0 3px #8dac8526}.add-form.listening .add-trigger{color:#3e7850}

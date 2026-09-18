@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { createClient } from '@supabase/supabase-js';
 import { DndContext, KeyboardSensor, MouseSensor, TouchSensor, closestCenter, useSensor, useSensors } from '@dnd-kit/core';
@@ -32,6 +32,8 @@ function SortableItem({ item, index, onDelete, onEdit }) {
 function App() {
   const [items, setItems] = useState([]);
   const [input, setInput] = useState('');
+  const [listening, setListening] = useState(false);
+  const speechRef = useRef(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -40,6 +42,62 @@ function App() {
     useSensor(TouchSensor, { activationConstraint: { delay: 120, tolerance: 8 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
+  const stopVoice = () => {
+    const session = speechRef.current;
+    if (!session) return;
+    session.active = false;
+    clearTimeout(session.timer);
+    clearTimeout(session.restartTimer);
+    try { session.recognition.stop(); } catch { /* Recognition may have ended already. */ }
+    speechRef.current = null;
+    setListening(false);
+  };
+  const startVoice = () => {
+    if (!/Android/i.test(navigator.userAgent) || speechRef.current) return;
+    const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!Recognition) { setError('Voice input is not supported by this browser. You can still type an item.'); return; }
+    const recognition = new Recognition();
+    const session = { recognition, active: true, base: input.trim(), committed: '', lastSpeech: Date.now(), timer: null, restartTimer: null };
+    speechRef.current = session;
+    recognition.lang = navigator.language || 'en-US';
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    const armSilenceTimer = () => {
+      session.lastSpeech = Date.now();
+      clearTimeout(session.timer);
+      session.timer = setTimeout(stopVoice, 3000);
+    };
+    recognition.onstart = () => { setListening(true); if (!session.started) { session.started = true; armSilenceTimer(); } };
+    recognition.onspeechstart = armSilenceTimer;
+    recognition.onspeechend = armSilenceTimer;
+    recognition.onresult = event => {
+      if (!session.active) return;
+      let final = '', interim = '';
+      for (const result of event.results) {
+        if (result.isFinal) final += result[0].transcript + ' ';
+        else interim += result[0].transcript + ' ';
+      }
+      session.segmentFinal = final.trim();
+      setInput([session.base, session.committed, final.trim(), interim.trim()].filter(Boolean).join(' '));
+      armSilenceTimer();
+    };
+    recognition.onerror = event => {
+      if (event.error !== 'no-speech' && event.error !== 'aborted') setError(`Voice input stopped: ${event.error}. You can still type an item.`);
+      stopVoice();
+    };
+    recognition.onend = () => {
+      if (!session.active) return;
+      session.committed = [session.committed, session.segmentFinal].filter(Boolean).join(' ');
+      session.segmentFinal = '';
+      if (Date.now() - session.lastSpeech >= 3000) { stopVoice(); return; }
+      session.restartTimer = setTimeout(() => {
+        if (!session.active) return;
+        try { recognition.start(); } catch { stopVoice(); }
+      }, 100);
+    };
+    try { recognition.start(); } catch { speechRef.current = null; setError('Could not start voice input. You can still type an item.'); }
+  };
+  useEffect(() => () => { if (speechRef.current) { clearTimeout(speechRef.current.timer); clearTimeout(speechRef.current.restartTimer); speechRef.current.recognition.abort(); } }, []);
   const refresh = async () => {
     if (!db) { setError('Supabase is not configured. Add VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY.'); setLoading(false); return; }
     const { data, error } = await db.from('priority_items_v1').select('id,title,position').order('position', { ascending: true }).order('created_at', { ascending: true });
@@ -49,6 +107,7 @@ function App() {
   useEffect(() => { refresh(); }, []);
   const add = async e => {
     e.preventDefault(); const title = input.trim(); if (!title || !db) return;
+    stopVoice();
     setSaving(true); setError('');
     const { data, error } = await db.from('priority_items_v1').insert({ title, position: items.length ? Math.max(...items.map(x => x.position)) + 1 : 0 }).select('id,title,position').single();
     if (error) setError(error.message); else { setItems(prev => [...prev, data]); setInput(''); }
@@ -78,7 +137,7 @@ function App() {
       <section className="list-panel">
         {error && <div className="error" role="alert">{error}<button onClick={() => setError('')} aria-label="Dismiss error"><X size={15}/></button></div>}
         {loading ? <div className="empty">Loading your list…</div> : items.length === 0 ? <div className="empty"><div className="empty-icon">✳</div><strong>A fresh start.</strong><span>Add your first item below.</span></div> : <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={dragEnd}><SortableContext items={items.map(x => x.id)} strategy={verticalListSortingStrategy}><div className="items">{items.map((item, i) => <SortableItem key={item.id} item={item} index={i} onDelete={remove} onEdit={edit}/>)}</div></SortableContext></DndContext>}
-        <form className="add-form" onSubmit={add}><button className="add-trigger" type="submit" disabled={!input.trim() || saving} aria-label="Add item" title="Add item"><Plus size={22}/></button><input value={input} onChange={e => setInput(e.target.value)} placeholder="Add something to your list…" aria-label="New list item" maxLength={200}/></form>
+        <form className={`add-form ${listening ? 'listening' : ''}`} onSubmit={add}><button className="add-trigger" type="submit" disabled={!input.trim() || saving} aria-label="Add item" title="Add item"><Plus size={22}/></button><input value={input} onClick={startVoice} onChange={e => { if (listening) stopVoice(); setInput(e.target.value); }} placeholder={listening ? 'Listening…' : 'Add something to your list…'} aria-label="New list item" maxLength={200}/></form>
       </section></main>
   </div>;
 }
