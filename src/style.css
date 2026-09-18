@@ -5,3 +5,4 @@
 .item{min-height:52px}.item-title,.edit-input{padding-top:6px;padding-bottom:6px}
 .item{min-height:42px}.item-title{font-weight:700;padding-top:3px;padding-bottom:3px}.edit-input{padding-top:3px;padding-bottom:3px}
 .item,.item-title{touch-action:manipulation}
+.add-form .add-trigger{display:grid;place-items:center;flex:0 0 36px;width:36px;height:36px;padding:0;border:0;border-radius:6px;background:transparent;color:#587759}.add-form .add-trigger:hover{background:#e9f0e7;color:#405e47}.add-form .add-trigger:disabled{background:transparent;color:#9eb19b;opacity:.7}
