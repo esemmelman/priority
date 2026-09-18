@@ -4,7 +4,7 @@ import { createClient } from '@supabase/supabase-js';
 import { DndContext, KeyboardSensor, PointerSensor, closestCenter, useSensor, useSensors } from '@dnd-kit/core';
 import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { ArrowUpRight, GripVertical, Plus, Trash2, X } from 'lucide-react';
+import { ArrowUpRight, Plus, Trash2, X } from 'lucide-react';
 import './style.css';
 
 const url = import.meta.env.VITE_SUPABASE_URL;
@@ -12,21 +12,20 @@ const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 const db = url && key ? createClient(url, key) : null;
 
 function SortableItem({ item, index, onDelete, onEdit }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id });
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(item.title);
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id, disabled: editing });
   const save = async () => {
     const title = draft.trim();
     setEditing(false);
     if (!title || title === item.title) { setDraft(item.title); return; }
     await onEdit(item.id, title);
   };
-  return <div ref={setNodeRef} className={`item ${isDragging ? 'dragging' : ''}`} style={{ transform: CSS.Transform.toString(transform), transition }}>
+  return <div ref={setNodeRef} className={`item ${isDragging ? 'dragging' : ''}`} style={{ transform: CSS.Transform.toString(transform), transition }} {...attributes} {...listeners} aria-label={`Drag ${item.title} to reorder`}>
     <span className="number">{String(index + 1).padStart(2, '0')}</span>
-    {editing ? <input className="edit-input" autoFocus value={draft} onChange={e => setDraft(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') save(); if (e.key === 'Escape') { setDraft(item.title); setEditing(false); } }} onBlur={save} aria-label="Edit item" />
-      : <button className="item-title" onClick={() => setEditing(true)} title="Click to edit">{item.title}</button>}
-    <button className="delete" onClick={() => onDelete(item.id)} aria-label={`Delete ${item.title}`} title="Delete"><Trash2 size={17}/></button>
-    <button className="handle" {...attributes} {...listeners} aria-label={`Drag ${item.title} to reorder`} title="Drag to reorder"><GripVertical size={19}/></button>
+    {editing ? <input className="edit-input" autoFocus value={draft} onChange={e => setDraft(e.target.value)} onKeyDown={e => { e.stopPropagation(); if (e.key === 'Enter') save(); if (e.key === 'Escape') { setDraft(item.title); setEditing(false); } }} onBlur={save} aria-label="Edit item" />
+      : <button className="item-title" onKeyDown={e => e.stopPropagation()} onClick={() => setEditing(true)} title="Click to edit">{item.title}</button>}
+    <button className="delete" onPointerDown={e => e.stopPropagation()} onKeyDown={e => e.stopPropagation()} onClick={() => onDelete(item.id)} aria-label={`Delete ${item.title}`} title="Delete"><Trash2 size={17}/></button>
   </div>;
 }
 
