@@ -7,8 +7,8 @@ create table if not exists public.priority_items_v1 (
 
 create index if not exists priority_items_v1_position_idx on public.priority_items_v1 (position, created_at);
 alter table public.priority_items_v1 enable row level security;
-grant select, insert, update, delete on public.priority_items_v1 to anon;
-create policy "Anyone can read priority items" on public.priority_items_v1 for select to anon using (true);
-create policy "Anyone can add priority items" on public.priority_items_v1 for insert to anon with check (true);
-create policy "Anyone can edit priority items" on public.priority_items_v1 for update to anon using (true) with check (true);
-create policy "Anyone can delete priority items" on public.priority_items_v1 for delete to anon using (true);
+grant select, insert, update, delete on public.priority_items_v1 to anon, authenticated;
+create policy "Anyone can read priority items" on public.priority_items_v1 for select to anon, authenticated using (true);
+create policy "Anyone can add priority items" on public.priority_items_v1 for insert to anon, authenticated with check (true);
+create policy "Anyone can edit priority items" on public.priority_items_v1 for update to anon, authenticated using (true) with check (true);
+create policy "Anyone can delete priority items" on public.priority_items_v1 for delete to anon, authenticated using (true);
