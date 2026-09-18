@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import { createRoot } from 'react-dom/client';
 import { createClient } from '@supabase/supabase-js';
 import { DndContext, KeyboardSensor, MouseSensor, TouchSensor, closestCenter, useSensor, useSensors } from '@dnd-kit/core';
@@ -38,6 +39,7 @@ function App() {
   const [listening, setListening] = useState(false);
   const [typingMode, setTypingMode] = useState(false);
   const inputRef = useRef(null);
+  const voiceTappedRef = useRef(false);
   const speechRef = useRef(null);
   const itemsRef = useRef(items);
   const savingRef = useRef(false);
@@ -64,7 +66,7 @@ function App() {
       const current = itemsRef.current;
       const { data, error } = await db.from('priority_items_v1').insert({ title, position: current.length ? Math.max(...current.map(x => x.position)) + 1 : 0 }).select('id,title,position').single();
       if (error) setError(error.message);
-      else { setItems(prev => [...prev, data]); setInput(''); setTypingMode(false); }
+      else { setItems(prev => [...prev, data]); setInput(''); setTypingMode(false); voiceTappedRef.current = false; }
     } catch (error) { setError(error.message || 'Could not add the item.'); }
     finally { savingRef.current = false; setSaving(false); }
   };
@@ -77,6 +79,16 @@ function App() {
     try { session.recognition.stop(); } catch { /* Recognition may have ended already. */ }
     speechRef.current = null;
     setListening(false);
+  };
+  const switchToTyping = () => {
+    stopVoice();
+    flushSync(() => setTypingMode(true));
+    inputRef.current?.focus();
+  };
+  const switchToVoice = () => {
+    inputRef.current?.blur();
+    voiceTappedRef.current = false;
+    setTypingMode(false);
   };
   const startVoice = () => {
     if (!/Android/i.test(navigator.userAgent) || speechRef.current) return;
@@ -169,7 +181,7 @@ function App() {
       <section className="list-panel">
         {error && <div className="error" role="alert">{error}<button onClick={() => setError('')} aria-label="Dismiss error"><X size={15}/></button></div>}
         {loading ? <div className="empty">Loading your list…</div> : items.length === 0 ? <div className="empty"><div className="empty-icon">✳</div><strong>A fresh start.</strong><span>Add your first item below.</span></div> : <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={dragEnd}><SortableContext items={items.map(x => x.id)} strategy={verticalListSortingStrategy}><div className="items">{items.map((item, i) => <SortableItem key={item.id} item={item} index={i} onDelete={remove} onEdit={edit}/>)}</div></SortableContext></DndContext>}
-        <form className={`add-form ${listening ? 'listening' : ''}`} onSubmit={add}><button className="add-trigger" type="submit" disabled={!input.trim() || saving} aria-label="Add item" title="Add item"><Plus size={22}/></button><EntryField ref={inputRef} rows={isAndroid ? 1 : undefined} value={input} readOnly={androidVoiceAvailable && !typingMode} inputMode={androidVoiceAvailable && !typingMode ? 'none' : 'text'} onPointerDown={e => { if (androidVoiceAvailable && !typingMode) { e.preventDefault(); startVoice(); } }} onChange={e => { if (listening) stopVoice(); setInput(e.target.value); }} placeholder={listening ? 'Listening…' : 'Add something to your list…'} aria-label="New list item" maxLength={200}/>{androidVoiceAvailable && <button className="entry-mode" type="button" onClick={() => { stopVoice(); setTypingMode(value => { if (value) inputRef.current?.blur(); else setTimeout(() => inputRef.current?.focus(), 0); return !value; }); }} aria-label={typingMode ? 'Switch to voice input' : 'Switch to typing'} title={typingMode ? 'Switch to voice input' : 'Switch to typing'}>{typingMode ? <Mic size={18}/> : <Keyboard size={18}/>}</button>}</form>
+        <form className={`add-form ${listening ? 'listening' : ''}`} onSubmit={add}><button className="add-trigger" type="submit" disabled={!input.trim() || saving} aria-label="Add item" title="Add item"><Plus size={22}/></button><EntryField ref={inputRef} rows={isAndroid ? 1 : undefined} value={input} readOnly={androidVoiceAvailable && !typingMode} inputMode={androidVoiceAvailable && !typingMode ? 'none' : 'text'} onPointerDown={e => { if (androidVoiceAvailable && !typingMode) { e.preventDefault(); if (voiceTappedRef.current) switchToTyping(); else { voiceTappedRef.current = true; startVoice(); } } }} onChange={e => { if (listening) stopVoice(); setInput(e.target.value); }} placeholder={listening ? 'Listening…' : 'Add something to your list…'} aria-label="New list item" maxLength={200}/>{androidVoiceAvailable && <button className="entry-mode" type="button" onClick={typingMode ? switchToVoice : switchToTyping} aria-label={typingMode ? 'Switch to voice input' : 'Switch to typing'} title={typingMode ? 'Switch to voice input' : 'Switch to typing'}>{typingMode ? <Mic size={18}/> : <Keyboard size={18}/>}</button>}</form>
       </section></main>
   </div>;
 }
