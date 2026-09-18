@@ -5,6 +5,7 @@ import { DndContext, KeyboardSensor, MouseSensor, TouchSensor, closestCenter, us
 import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Keyboard, Mic, Plus, Trash2, X } from 'lucide-react';
+import { mergeTranscript } from './transcript.js';
 import './style.css';
 
 const url = import.meta.env.VITE_SUPABASE_URL;
@@ -76,13 +77,13 @@ function App() {
     recognition.onspeechend = armSilenceTimer;
     recognition.onresult = event => {
       if (!session.active) return;
-      let final = '', interim = '';
+      let segment = '';
       for (const result of event.results) {
-        if (result.isFinal) final += result[0].transcript + ' ';
-        else interim += result[0].transcript + ' ';
+        segment = mergeTranscript(segment, result[0].transcript);
       }
-      session.segmentFinal = final.trim();
-      setInput([session.base, session.committed, final.trim(), interim.trim()].filter(Boolean).join(' '));
+      session.segmentText = segment;
+      const dictated = mergeTranscript(session.committed, segment);
+      setInput([session.base, dictated].filter(Boolean).join(' '));
       armSilenceTimer();
     };
     recognition.onerror = event => {
@@ -91,8 +92,8 @@ function App() {
     };
     recognition.onend = () => {
       if (!session.active) return;
-      session.committed = [session.committed, session.segmentFinal].filter(Boolean).join(' ');
-      session.segmentFinal = '';
+      session.committed = mergeTranscript(session.committed, session.segmentText || '');
+      session.segmentText = '';
       if (Date.now() - session.lastSpeech >= 3000) { stopVoice(); return; }
       session.restartTimer = setTimeout(() => {
         if (!session.active) return;
