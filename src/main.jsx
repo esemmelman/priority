@@ -11,7 +11,8 @@ import './style.css';
 const url = import.meta.env.VITE_SUPABASE_URL;
 const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 const db = url && key ? createClient(url, key) : null;
-const androidVoiceAvailable = /Android/i.test(navigator.userAgent) && !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+const isAndroid = /Android/i.test(navigator.userAgent);
+const androidVoiceAvailable = isAndroid && !!(window.SpeechRecognition || window.webkitSpeechRecognition);
 
 function SortableItem({ item, index, onDelete, onEdit }) {
   const [editing, setEditing] = useState(false);
@@ -41,6 +42,11 @@ function App() {
   const itemsRef = useRef(items);
   const savingRef = useRef(false);
   itemsRef.current = items;
+  useEffect(() => {
+    if (!isAndroid || !inputRef.current) return;
+    inputRef.current.style.height = 'auto';
+    inputRef.current.style.height = `${inputRef.current.scrollHeight}px`;
+  }, [input]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -157,12 +163,13 @@ function App() {
     const { error } = await db.from('priority_items_v1').upsert(reordered.map(({ id, title, position }) => ({ id, title, position })));
     if (error) { setItems(items); setError(error.message); }
   };
+  const EntryField = isAndroid ? 'textarea' : 'input';
   return <div className="shell">
     <main className="content">
       <section className="list-panel">
         {error && <div className="error" role="alert">{error}<button onClick={() => setError('')} aria-label="Dismiss error"><X size={15}/></button></div>}
         {loading ? <div className="empty">Loading your list…</div> : items.length === 0 ? <div className="empty"><div className="empty-icon">✳</div><strong>A fresh start.</strong><span>Add your first item below.</span></div> : <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={dragEnd}><SortableContext items={items.map(x => x.id)} strategy={verticalListSortingStrategy}><div className="items">{items.map((item, i) => <SortableItem key={item.id} item={item} index={i} onDelete={remove} onEdit={edit}/>)}</div></SortableContext></DndContext>}
-        <form className={`add-form ${listening ? 'listening' : ''}`} onSubmit={add}><button className="add-trigger" type="submit" disabled={!input.trim() || saving} aria-label="Add item" title="Add item"><Plus size={22}/></button><input ref={inputRef} value={input} readOnly={androidVoiceAvailable && !typingMode} inputMode={androidVoiceAvailable && !typingMode ? 'none' : 'text'} onPointerDown={e => { if (androidVoiceAvailable && !typingMode) { e.preventDefault(); startVoice(); } }} onChange={e => { if (listening) stopVoice(); setInput(e.target.value); }} placeholder={listening ? 'Listening…' : 'Add something to your list…'} aria-label="New list item" maxLength={200}/>{androidVoiceAvailable && <button className="entry-mode" type="button" onClick={() => { stopVoice(); setTypingMode(value => { if (value) inputRef.current?.blur(); else setTimeout(() => inputRef.current?.focus(), 0); return !value; }); }} aria-label={typingMode ? 'Switch to voice input' : 'Switch to typing'} title={typingMode ? 'Switch to voice input' : 'Switch to typing'}>{typingMode ? <Mic size={18}/> : <Keyboard size={18}/>}</button>}</form>
+        <form className={`add-form ${listening ? 'listening' : ''}`} onSubmit={add}><button className="add-trigger" type="submit" disabled={!input.trim() || saving} aria-label="Add item" title="Add item"><Plus size={22}/></button><EntryField ref={inputRef} rows={isAndroid ? 1 : undefined} value={input} readOnly={androidVoiceAvailable && !typingMode} inputMode={androidVoiceAvailable && !typingMode ? 'none' : 'text'} onPointerDown={e => { if (androidVoiceAvailable && !typingMode) { e.preventDefault(); startVoice(); } }} onChange={e => { if (listening) stopVoice(); setInput(e.target.value); }} placeholder={listening ? 'Listening…' : 'Add something to your list…'} aria-label="New list item" maxLength={200}/>{androidVoiceAvailable && <button className="entry-mode" type="button" onClick={() => { stopVoice(); setTypingMode(value => { if (value) inputRef.current?.blur(); else setTimeout(() => inputRef.current?.focus(), 0); return !value; }); }} aria-label={typingMode ? 'Switch to voice input' : 'Switch to typing'} title={typingMode ? 'Switch to voice input' : 'Switch to typing'}>{typingMode ? <Mic size={18}/> : <Keyboard size={18}/>}</button>}</form>
       </section></main>
   </div>;
 }

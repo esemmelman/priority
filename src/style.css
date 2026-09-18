@@ -10,3 +10,4 @@
 .add-form.listening{border-color:#86a980;box-shadow:0 0 0 3px #8dac8526}.add-form.listening .add-trigger{color:#3e7850}
 .add-form input{font-size:20px;line-height:1.35}.add-form .entry-mode{display:grid;place-items:center;flex:0 0 36px;width:36px;height:36px;padding:0;border:0;border-radius:6px;background:transparent;color:#8ba088}.add-form .entry-mode:hover{background:#e9f0e7;color:#405e47}@media(max-width:600px){.add-form input{font-size:20px}}
 .item-title,.edit-input{font-size:18px}
+.add-form textarea{flex:1;min-width:0;min-height:36px;border:0;background:transparent;outline:0;color:#344034;font:400 20px/1.35 "DM Sans",sans-serif;resize:none;overflow:hidden;padding:4px 0;white-space:pre-wrap;overflow-wrap:anywhere}.add-form textarea::placeholder{color:#a9b2a7}
