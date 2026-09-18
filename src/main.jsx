@@ -38,6 +38,9 @@ function App() {
   const [typingMode, setTypingMode] = useState(false);
   const inputRef = useRef(null);
   const speechRef = useRef(null);
+  const itemsRef = useRef(items);
+  const savingRef = useRef(false);
+  itemsRef.current = items;
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -46,6 +49,19 @@ function App() {
     useSensor(TouchSensor, { activationConstraint: { delay: 120, tolerance: 8 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
+  const saveItem = async title => {
+    title = title.trim();
+    if (!title || !db || savingRef.current) return;
+    savingRef.current = true;
+    setSaving(true); setError('');
+    try {
+      const current = itemsRef.current;
+      const { data, error } = await db.from('priority_items_v1').insert({ title, position: current.length ? Math.max(...current.map(x => x.position)) + 1 : 0 }).select('id,title,position').single();
+      if (error) setError(error.message);
+      else { setItems(prev => [...prev, data]); setInput(''); setTypingMode(false); }
+    } catch (error) { setError(error.message || 'Could not add the item.'); }
+    finally { savingRef.current = false; setSaving(false); }
+  };
   const stopVoice = () => {
     const session = speechRef.current;
     if (!session) return;
@@ -67,10 +83,17 @@ function App() {
     recognition.lang = navigator.language || 'en-US';
     recognition.continuous = true;
     recognition.interimResults = true;
+    const autoAddVoice = () => {
+      if (!session.active) return;
+      const dictated = mergeTranscript(session.committed, session.segmentText || '');
+      const title = [session.base, dictated].filter(Boolean).join(' ').trim();
+      stopVoice();
+      if (dictated) void saveItem(title);
+    };
     const armSilenceTimer = () => {
       session.lastSpeech = Date.now();
       clearTimeout(session.timer);
-      session.timer = setTimeout(stopVoice, 3000);
+      session.timer = setTimeout(autoAddVoice, 3000);
     };
     recognition.onstart = () => { setListening(true); if (!session.started) { session.started = true; armSilenceTimer(); } };
     recognition.onspeechstart = armSilenceTimer;
@@ -94,7 +117,7 @@ function App() {
       if (!session.active) return;
       session.committed = mergeTranscript(session.committed, session.segmentText || '');
       session.segmentText = '';
-      if (Date.now() - session.lastSpeech >= 3000) { stopVoice(); return; }
+      if (Date.now() - session.lastSpeech >= 3000) { autoAddVoice(); return; }
       session.restartTimer = setTimeout(() => {
         if (!session.active) return;
         try { recognition.start(); } catch { stopVoice(); }
@@ -111,12 +134,9 @@ function App() {
   };
   useEffect(() => { refresh(); }, []);
   const add = async e => {
-    e.preventDefault(); const title = input.trim(); if (!title || !db) return;
+    e.preventDefault();
     stopVoice();
-    setSaving(true); setError('');
-    const { data, error } = await db.from('priority_items_v1').insert({ title, position: items.length ? Math.max(...items.map(x => x.position)) + 1 : 0 }).select('id,title,position').single();
-    if (error) setError(error.message); else { setItems(prev => [...prev, data]); setInput(''); setTypingMode(false); }
-    setSaving(false);
+    await saveItem(input);
   };
   const edit = async (id, title) => {
     const previous = items; setItems(items.map(x => x.id === id ? { ...x, title } : x));
